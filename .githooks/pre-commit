@@ -1,0 +1,2 @@
+#!/usr/bin/env bash
+echo 'RoleGuard: hãy đặt COMMITTER_ROLE để commit đúng phạm vi.'
