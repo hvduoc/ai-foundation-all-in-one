@@ -1,8 +1,11 @@
-# PLAN – Sprint 0 (MVP "AI Company Webapp")
+# PLAN – Sprint 1
 ## Mục tiêu
-- Kết nối được quy trình: PLAN → ARCHITECTURE → PROGRESS → webapp
-## Backlog Sprint 0
-1. Planner: Viết PLAN.md (20')
-2. Architect: Phác thảo ARCHITECTURE.md (30')
-3. QA: Định nghĩa TESTING.md (10')
-4. Planner/Architect/QA: Tạo PROGRESS.md bảng mẫu (10')
+- Thêm hiển thị KPI thật (lấy từ KPI_DASHBOARD.md).
+- Tạo Sprint chart hiển thị % hoàn thành task.
+
+## Backlog Sprint 1
+1. Planner: Cập nhật PLAN.md (Gemini).
+2. Architect: Mở rộng ARCHITECTURE.md mô tả luồng dữ liệu KPI.
+3. QA: Viết checklist TESTING.md cho KPI (có số thực, không rỗng).
+4. Builder (Copilot): Update KPI_DASHBOARD.md (ví dụ Coverage=75, Velocity=80).
+5. Ops: Đẩy webapp lên GitHub Pages để team AI cùng xem.

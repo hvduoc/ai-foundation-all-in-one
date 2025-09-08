@@ -1,7 +1,8 @@
-# PROGRESS – Sprint 0
-| ID | Story/Task                        | Role Owner | Status     | % Done | Next Step         |
-|----|-----------------------------------|------------|------------|--------|-------------------|
-| 1  | Viết PLAN.md                      | Planner    | ✅ Done    | 100%   | -                 |
-| 2  | Phác thảo ARCHITECTURE.md         | Architect  | ✅ Done    | 100%   | -                 |
-| 3  | Định nghĩa TESTING.md             | QA         | ✅ Done    | 100%   | -                 |
-| 4  | Chuẩn bị PROGRESS.md (bảng mẫu)   | Planner    | ✅ Done    | 100%   | -                 |
+# PROGRESS – Sprint 1
+| ID | Story/Task                           | Role Owner | Status     | % Done | Next Step           |
+|----|--------------------------------------|------------|------------|--------|---------------------|
+| 1  | Cập nhật PLAN.md Sprint 1            | Planner    | ✅ Done    | 100%   | -                   |
+| 2  | Mở rộng ARCHITECTURE.md cho KPI      | Architect  | 🚧 In Prog.| 60%    | Bổ sung chi tiết    |
+| 3  | Viết checklist TESTING cho KPI       | QA         | ⏳ Pending | 0%     | Viết test            |
+| 4  | Update KPI_DASHBOARD.md              | Builder    | ⏳ Pending | 0%     | Ghi giá trị KPI      |
+| 5  | Deploy webapp lên GitHub Pages       | Ops        | ⏳ Pending | 0%     | Thiết lập Pages      |
