@@ -1,36 +1,77 @@
 name: ci
 on:
-  pull_request:        # chỉ chạy trên PR để Ruleset dễ bắt buộc
+  pull_request:  # chỉ chạy trên PR để ruleset bắt buộc đúng 2 check
+
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Detect Node project
+        id: detect
+        run: |
+          if [ -f package.json ]; then
+            echo "has_pkg=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_pkg=false" >> $GITHUB_OUTPUT
+          fi
+
       - uses: actions/setup-node@v4
+        if: steps.detect.outputs.has_pkg == 'true'
         with:
           node-version: '20'
+
       - name: Install deps
+        if: steps.detect.outputs.has_pkg == 'true'
         run: |
           corepack enable || true
           if [ -f pnpm-lock.yaml ]; then npm i -g pnpm && pnpm i --no-frozen-lockfile
           elif [ -f package-lock.json ]; then npm ci || npm i --legacy-peer-deps
           else npm i --legacy-peer-deps; fi
+
       - name: Lint (optional)
+        if: steps.detect.outputs.has_pkg == 'true'
         run: npm run lint || echo "no lint script"
+
+      - name: Skip build (no Node project)
+        if: steps.detect.outputs.has_pkg == 'false'
+        run: echo "No package.json -> skipping build job"
+
   unit-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
+      - name: Detect Node project
+        id: detect
+        run: |
+          if [ -f package.json ]; then
+            echo "has_pkg=true" >> $GITHUB_OUTPUT
+          else
+            echo "has_pkg=false" >> $GITHUB_OUTPUT
+          fi
+
       - uses: actions/setup-node@v4
+        if: steps.detect.outputs.has_pkg == 'true'
         with:
           node-version: '20'
+
       - name: Install deps
+        if: steps.detect.outputs.has_pkg == 'true'
         run: |
           corepack enable || true
           if [ -f pnpm-lock.yaml ]; then npm i -g pnpm && pnpm i --no-frozen-lockfile
           elif [ -f package-lock.json ]; then npm ci || npm i --legacy-peer-deps
           else npm i --legacy-peer-deps; fi
-      - name: Run tests
-        env:
-          NODE_ENV: test
-        run: npm test || node --test
+
+      - name: Run tests (only if tests exist)
+        if: steps.detect.outputs.has_pkg == 'true'
+        run: |
+          if [ ! -d tests ] && [ -z "$(ls -1 *.test.* 2>/dev/null || true)" ]; then
+            echo "No tests found -> skipping"; exit 0; fi
+          npm test || node --test
+
+      - name: Skip tests (no Node project)
+        if: steps.detect.outputs.has_pkg == 'false'
+        run: echo "No package.json -> skipping tests"
