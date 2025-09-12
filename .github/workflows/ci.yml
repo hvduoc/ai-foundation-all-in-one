@@ -1,9 +1,6 @@
 name: ci
 on:
-  pull_request:
-  push:
-    branches: [main]
-
+  pull_request:        # chỉ chạy trên PR để Ruleset dễ bắt buộc
 jobs:
   build:
     runs-on: ubuntu-latest
@@ -15,16 +12,11 @@ jobs:
       - name: Install deps
         run: |
           corepack enable || true
-          if [ -f pnpm-lock.yaml ]; then
-            pnpm i --frozen-lockfile || pnpm i
-          elif [ -f package-lock.json ]; then
-            npm ci || npm i
-          else
-            npm i
-          fi
-      - name: Lint (skip if none)
-        run: |
-          npm run lint || echo "no lint script"
+          if [ -f pnpm-lock.yaml ]; then npm i -g pnpm && pnpm i --no-frozen-lockfile
+          elif [ -f package-lock.json ]; then npm ci || npm i --legacy-peer-deps
+          else npm i --legacy-peer-deps; fi
+      - name: Lint (optional)
+        run: npm run lint || echo "no lint script"
   unit-tests:
     runs-on: ubuntu-latest
     steps:
@@ -35,13 +27,10 @@ jobs:
       - name: Install deps
         run: |
           corepack enable || true
-          if [ -f pnpm-lock.yaml ]; then
-            pnpm i --frozen-lockfile || pnpm i
-          elif [ -f package-lock.json ]; then
-            npm ci || npm i
-          else
-            npm i
-          fi
+          if [ -f pnpm-lock.yaml ]; then npm i -g pnpm && pnpm i --no-frozen-lockfile
+          elif [ -f package-lock.json ]; then npm ci || npm i --legacy-peer-deps
+          else npm i --legacy-peer-deps; fi
       - name: Run tests
-        run: |
-          npm test || node --test
+        env:
+          NODE_ENV: test
+        run: npm test || node --test
