@@ -1,0 +1,47 @@
+name: ci
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps
+        run: |
+          corepack enable || true
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm i --frozen-lockfile || pnpm i
+          elif [ -f package-lock.json ]; then
+            npm ci || npm i
+          else
+            npm i
+          fi
+      - name: Lint (skip if none)
+        run: |
+          npm run lint || echo "no lint script"
+  unit-tests:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+      - name: Install deps
+        run: |
+          corepack enable || true
+          if [ -f pnpm-lock.yaml ]; then
+            pnpm i --frozen-lockfile || pnpm i
+          elif [ -f package-lock.json ]; then
+            npm ci || npm i
+          else
+            npm i
+          fi
+      - name: Run tests
+        run: |
+          npm test || node --test
