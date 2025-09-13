@@ -1,11 +1,8 @@
 ﻿name: ci
+
 on:
   pull_request:
-    branches: [main]
-
-concurrency:
-  group: ci-${{ github.ref }}
-  cancel-in-progress: true
+    branches: [ main ]
 
 jobs:
   build:
@@ -16,42 +13,37 @@ jobs:
         with:
           node-version: '20'
           cache: 'pnpm'
-      - name: Use pnpm via corepack
+      - name: Enable corepack & prepare pnpm
         run: |
           corepack enable
-          corepack prepare pnpm@10.16.0 --activate
-          pnpm -v
+          corepack prepare pnpm@10 --activate
       - name: Install deps
         run: pnpm install --frozen-lockfile
       - name: Build (skip if no script)
         run: |
-          if jq -e '.scripts.build' package.json >/dev/null; then
-            pnpm run -s build
+          if [ -f package.json ] && jq -e '.scripts.build' package.json >/dev/null; then
+            pnpm build
           else
             echo "No build script -> skip"
           fi
 
   unit-tests:
     runs-on: ubuntu-latest
-    needs: build
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
         with:
           node-version: '20'
           cache: 'pnpm'
-      - name: Use pnpm via corepack
+      - name: Enable corepack & prepare pnpm
         run: |
           corepack enable
-          corepack prepare pnpm@10.16.0 --activate
-          pnpm -v
+          corepack prepare pnpm@10 --activate
       - name: Install deps
         run: pnpm install --frozen-lockfile
-      - name: Run tests (fallback to node --test)
-        run: |
-          if jq -e '.scripts.test' package.json >/dev/null; then
-            pnpm test
-          else
-            node --test
-          fi
-
+      - name: Run tests
+        env:
+          KEY_PREFIX: aifao1:ci:
+          USER_CACHE_TTL: '60'
+          CACHE_ENABLED: '1'
+        run: pnpm test
