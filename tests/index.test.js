@@ -23,5 +23,5 @@ test('Cache Hit: lần gọi thứ 2 lấy từ cache', async () => {
   assert.equal(first.fromCache, false);
 
   const second = await main({ redisClient: redis });
-  assert.equal(second.fromCache, true); // HIT => true
+  assert.equal(second.fromCache, true);
 });
