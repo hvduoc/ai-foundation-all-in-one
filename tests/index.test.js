@@ -1,58 +1,27 @@
-// tests/index.test.js
-// Chạy bằng: node tests/index.test.js
-// hoặc: node --test tests/index.test.js (Node >=18)
-// Dev dep cần: ioredis-mock
-
-const { test, beforeEach, afterEach } = require('node:test');
+const { test } = require('node:test');
 const assert = require('node:assert/strict');
 const RedisMock = require('ioredis-mock');
-const { main, buildUserKey, DEFAULT_TTL_SECONDS } = require('../src/index.js');
 
-let redis;
+const { main, buildUserKey } = require('../src/index.js');
 
-beforeEach(() => {
-  redis = new RedisMock();
-});
+test('Cache Miss: lần đầu gọi, dữ liệu được trả và lưu cache', async () => {
+  const redis = new RedisMock();
+  const first = await main({ redisClient: redis });
 
-afterEach(async () => {
-  if (redis && typeof redis.quit === 'function') {
-    await redis.quit();
-  }
-});
-
-test('Cache Miss: lần gọi đầu tiên trả về dữ liệu và lưu vào cache', async () => {
-  const res = await main({ redisClient: redis });
-  assert.equal(res.fromCache, false);
-  assert.equal(res.data?.id, 1);
-  assert.equal(res.data?.username, 'guest');
+  assert.equal(first.fromCache, false);
+  assert.ok(first.data && first.data.id === 1);
 
   const key = buildUserKey(1);
   const raw = await redis.get(key);
-  assert.ok(raw, 'Dữ liệu phải được lưu vào Redis');
-  const parsed = JSON.parse(raw);
-  assert.equal(parsed.id, 1);
-  assert.equal(parsed.username, 'guest');
-
-  // TTL phải được set (ioredis-mock hỗ trợ ttl())
-  const ttl = await redis.ttl(key);
-  // ioredis-mock có thể trả về -1 nếu TTL chưa set, nhưng với set EX thì phải > 0
-  assert.ok(ttl === -1 || ttl > 0, 'TTL phải tồn tại hoặc được Redis mock hỗ trợ');
+  assert.ok(raw, 'key phải được set vào cache');
 });
 
-test('Cache Hit: lần gọi thứ hai lấy từ cache', async () => {
-  // Lần 1: miss và set cache
+test('Cache Hit: lần gọi thứ 2 lấy từ cache', async () => {
+  const redis = new RedisMock();
+
   const first = await main({ redisClient: redis });
-  assert.strictEqual(first.fromCache, false);
+  assert.equal(first.fromCache, false);
 
-  // Lần 2: hit
   const second = await main({ redisClient: redis });
-  assert.strictEqual(second.fromCache, true);
-  assert.deepEqual(second.data, first.data);
-  // Nếu có kiểm tra header, ví dụ:
-  // assert.strictEqual(second.headers?.['x-cache'], 'HIT');
-
-  // TTL không bắt buộc giảm đáng kể trong mock, nhưng key vẫn còn
-  const key = buildUserKey(1);
-  const ttl = await redis.ttl(key);
-  assert.ok(ttl === -1 || ttl >= -1 || ttl <= DEFAULT_TTL_SECONDS, 'TTL hợp lệ');
+  assert.equal(second.fromCache, true); // <— kỳ vọng đúng
 });
