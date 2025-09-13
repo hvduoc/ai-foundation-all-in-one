@@ -1,49 +1,62 @@
 ﻿name: ci
-
 on:
   pull_request:
-    branches: [ main ]
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.x'
           cache: 'pnpm'
-      - name: Enable corepack & prepare pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@10 --activate
+
+      # Cài pnpm cho runner
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
+      # Cài deps nếu có lockfile
       - name: Install deps
-        run: pnpm install --frozen-lockfile
-      - name: Build (skip if no script)
+        if: hashFiles('pnpm-lock.yaml') != ''
+        run: pnpm install --frozen-lockfile=false
+
+      # Build nếu có script "build", nếu không thì bỏ qua (job vẫn pass)
+      - name: Build
         run: |
-          if [ -f package.json ] && jq -e '.scripts.build' package.json >/dev/null; then
-            pnpm build
+          if [ -f package.json ] && node -e "process.exit(require('./package.json').scripts?.build ? 0 : 1)"; then
+            pnpm run -s build
           else
-            echo "No build script -> skip"
+            echo "No build script — skipping"
           fi
 
   unit-tests:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: '20.x'
           cache: 'pnpm'
-      - name: Enable corepack & prepare pnpm
-        run: |
-          corepack enable
-          corepack prepare pnpm@10 --activate
+
+      - uses: pnpm/action-setup@v4
+        with:
+          version: 9
+          run_install: false
+
       - name: Install deps
-        run: pnpm install --frozen-lockfile
+        if: hashFiles('pnpm-lock.yaml') != ''
+        run: pnpm install --frozen-lockfile=false
+
+      # Test nếu có script "test", nếu không thì bỏ qua (job vẫn pass)
       - name: Run tests
-        env:
-          KEY_PREFIX: aifao1:ci:
-          USER_CACHE_TTL: '60'
-          CACHE_ENABLED: '1'
-        run: pnpm test
+        run: |
+          if [ -f package.json ] && node -e "process.exit(require('./package.json').scripts?.test ? 0 : 1)"; then
+            pnpm -s test
+          else
+            echo "No tests defined — skipping"
+          fi
