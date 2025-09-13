@@ -1,4 +1,4 @@
-# Repo rules
+﻿# Repo rules
 
 - Kiến trúc: Fastify + Redis Cloud (Upstash, TLS `rediss://`) với **Redis singleton**; không connect/quit trong handler.
 - Cấu hình Redis: đọc `REDIS_URL`, `KEY_PREFIX`, `USER_CACHE_TTL`; TTL mặc định 300–600s; header `X-Cache: HIT|MISS|BYPASS`.
@@ -9,4 +9,5 @@
 - Pull Request: đính kèm Issue, checklist, mô tả tác động & plan Workspace; CI xanh là điều kiện merge.
 
 ## Acceptance
-- File tồn tại `.github/copilot-instructions.md`. Commit theo Conventional Commits.
+- File tồn tại: `.github/copilot-instructions.md`.
+- Nội dung trùng khớp, commit theo Conventional Commits.
