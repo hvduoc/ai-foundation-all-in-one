@@ -6,6 +6,8 @@ const { main, buildUserKey } = require('../src/index.js');
 
 test('Cache Miss: lần đầu gọi, dữ liệu được trả và lưu cache', async () => {
   const redis = new RedisMock();
+  await redis.flushall(); // đảm bảo trống
+
   const first = await main({ redisClient: redis });
 
   assert.equal(first.fromCache, false);
@@ -18,10 +20,11 @@ test('Cache Miss: lần đầu gọi, dữ liệu được trả và lưu cache'
 
 test('Cache Hit: lần gọi thứ 2 lấy từ cache', async () => {
   const redis = new RedisMock();
+  await redis.flushall(); // đảm bảo trống
 
   const first = await main({ redisClient: redis });
-  assert.equal(first.fromCache, false);
+  assert.equal(first.fromCache, false); // lần 1 phải MISS
 
   const second = await main({ redisClient: redis });
-  assert.equal(second.fromCache, true);
+  assert.equal(second.fromCache, true); // lần 2 phải HIT
 });
