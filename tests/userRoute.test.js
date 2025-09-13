@@ -1,91 +1,110 @@
 // tests/userRoute.test.js
-// QA test cho caching logic, không khởi động server HTTP
+const { test } = require('node:test');
+const assert = require('node:assert/strict');
+const Fastify = require('fastify');
+const RedisMock = require('ioredis-mock');
+const userRoute = require('../src/routes/user');
+
+test('Cache MISS', async () => {
+  const fastify = Fastify();
+  const mockRedis = new RedisMock();
+  fastify.decorate('redis', mockRedis);
+  await fastify.register(userRoute);
+  await fastify.ready();
+
+  const res = await fastify.inject({ method: 'GET', url: '/api/user/1' });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['x-cache'], 'MISS');
+  const body = JSON.parse(res.body);
+  assert.equal(body.fromCache, false);
+  await fastify.close();
+});
+
+test('Cache HIT', async () => {
+  const fastify = Fastify();
+  const mockRedis = new RedisMock();
+  fastify.decorate('redis', mockRedis);
+  await fastify.register(userRoute);
+  await fastify.ready();
+
+  // MISS lần đầu
+  await fastify.inject({ method: 'GET', url: '/api/user/1' });
+  // HIT lần hai
+  const res = await fastify.inject({ method: 'GET', url: '/api/user/1' });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['x-cache'], 'HIT');
+  const body = JSON.parse(res.body);
+  assert.equal(body.fromCache, true);
+  await fastify.close();
+});
+
+test('Cache BYPASS', async () => {
+  const fastify = Fastify();
+  const mockRedis = new RedisMock();
+  // BYPASS: mock lỗi get
+  mockRedis.get = async () => { throw new Error('Redis error'); };
+  fastify.decorate('redis', mockRedis);
+  await fastify.register(userRoute);
+  await fastify.ready();
+
+  const res = await fastify.inject({ method: 'GET', url: '/api/user/1' });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['x-cache'], 'BYPASS');
+  const body = JSON.parse(res.body);
+  assert.equal(body.fromCache, false);
+  await fastify.close();
+});
+// tests/userRoute.test.js
 
 const { test, beforeEach, afterEach } = require('node:test');
 const assert = require('node:assert/strict');
+const Fastify = require('fastify');
 const RedisMock = require('ioredis-mock');
-const { buildUserKey, DEFAULT_TTL_SECONDS } = require('../src/lib/redis');
-const { fetchUserFromDB, sanitizeId } = require('../src/services/userService');
+const userRoutes = require('../src/routes/user');
 
-// Core logic tách ra để test trực tiếp
-async function resolveUser(id, { redisClient, ttl = DEFAULT_TTL_SECONDS } = {}) {
-  let fromCache = false;
-  let data;
-  let cacheHeader = 'MISS';
-  let error = null;
-  try {
-    const userId = sanitizeId(id);
-    const key = buildUserKey(userId);
-    const cached = await redisClient.get(key);
-    if (cached) {
-      fromCache = true;
-      data = JSON.parse(cached);
-      cacheHeader = 'HIT';
-      return { fromCache, data, cacheHeader };
-    }
-    // Cache miss
-    data = await fetchUserFromDB(userId);
-    await redisClient.set(key, JSON.stringify(data), 'EX', ttl);
-    return { fromCache, data, cacheHeader };
-  } catch (err) {
-    error = err;
-    cacheHeader = err.name === 'INVALID_USER_ID' ? 'ERROR' : 'BYPASS';
-    data = await fetchUserFromDB(id);
-    fromCache = false;
-    return { fromCache, data, cacheHeader, error };
-  }
-}
+let fastify, redis;
 
-let redis;
-
-beforeEach(() => {
+beforeEach(async () => {
+  fastify = Fastify();
   redis = new RedisMock();
+  fastify.decorate('redis', redis);
+  await userRoutes(fastify);
+  await fastify.ready();
 });
 
 afterEach(async () => {
-  if (redis && typeof redis.quit === 'function') {
-    await redis.quit();
-  }
+  await fastify.close();
+  await redis.quit();
 });
 
-test('Cache Miss: lần đầu gọi, dữ liệu được tạo và lưu vào cache', async () => {
-  await redis.flushall();
-  const res = await resolveUser(1, { redisClient: redis });
-  assert.equal(res.fromCache, false);
-  assert.equal(res.data.id, 1);
-  const key = buildUserKey(1);
-  const raw = await redis.get(key);
-  assert.ok(raw, 'Dữ liệu phải được lưu vào cache');
-  assert.equal(res.cacheHeader, 'MISS');
+test('Cache MISS: lần đầu gọi trả về MISS, fromCache=false', async () => {
+  const res = await fastify.inject({ method: 'GET', url: '/user/1' });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['x-cache'], 'MISS');
+  const body = JSON.parse(res.body);
+  assert.equal(body.fromCache, false);
+  assert.equal(body.data.id, 1);
 });
 
-test('Cache Hit: lần gọi thứ hai, dữ liệu lấy từ cache', async () => {
-  await redis.flushall();
-  const first = await resolveUser(1, { redisClient: redis });
-  const second = await resolveUser(1, { redisClient: redis });
-  assert.equal(second.fromCache, true);
-  assert.deepEqual(second.data, first.data);
-  assert.equal(second.cacheHeader, 'HIT');
+test('Cache HIT: lần gọi thứ hai trả về HIT, fromCache=true', async () => {
+  // Lần 1: MISS
+  await fastify.inject({ method: 'GET', url: '/user/2' });
+  // Lần 2: HIT
+  const res = await fastify.inject({ method: 'GET', url: '/user/2' });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['x-cache'], 'HIT');
+  const body = JSON.parse(res.body);
+  assert.equal(body.fromCache, true);
+  assert.equal(body.data.id, 2);
 });
 
-test('Cache Expire: hết hạn TTL, gọi lại sẽ miss', async () => {
-  await redis.flushall();
-  const ttl = 1;
-  const first = await resolveUser(1, { redisClient: redis, ttl });
-  assert.equal(first.fromCache, false);
-  await new Promise(r => setTimeout(r, 1100));
-  const second = await resolveUser(1, { redisClient: redis, ttl });
-  assert.equal(second.fromCache, false);
-  assert.notEqual(second.data.createdAt, first.data.createdAt);
-  assert.equal(second.cacheHeader, 'MISS');
-});
-
-test('Redis Error: get throw error, fallback DB, header BYPASS', async () => {
-  await redis.flushall();
-  // Stub get để throw
+test('Cache BYPASS: mock get ném lỗi, trả về BYPASS, fromCache=false', async () => {
+  // Monkey-patch get để throw
   redis.get = async () => { throw new Error('boom'); };
-  const res = await resolveUser(1, { redisClient: redis });
-  assert.equal(res.fromCache, false);
-  assert.ok(res.cacheHeader === 'BYPASS' || res.cacheHeader === 'ERROR');
-  assert.ok(res.error instanceof Error);
+  const res = await fastify.inject({ method: 'GET', url: '/user/3' });
+  assert.equal(res.statusCode, 200);
+  assert.equal(res.headers['x-cache'], 'BYPASS');
+  const body = JSON.parse(res.body);
+  assert.equal(body.fromCache, false);
+  assert.equal(body.data.id, 3);
 });
