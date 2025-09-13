@@ -1,77 +1,57 @@
-name: ci
+﻿name: ci
 on:
-  pull_request:  # chỉ chạy trên PR để ruleset bắt buộc đúng 2 check
+  pull_request:
+    branches: [main]
+
+concurrency:
+  group: ci-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-
-      - name: Detect Node project
-        id: detect
-        run: |
-          if [ -f package.json ]; then
-            echo "has_pkg=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_pkg=false" >> $GITHUB_OUTPUT
-          fi
-
       - uses: actions/setup-node@v4
-        if: steps.detect.outputs.has_pkg == 'true'
         with:
           node-version: '20'
-
-      - name: Install deps
-        if: steps.detect.outputs.has_pkg == 'true'
+          cache: 'pnpm'
+      - name: Use pnpm via corepack
         run: |
-          corepack enable || true
-          if [ -f pnpm-lock.yaml ]; then npm i -g pnpm && pnpm i --no-frozen-lockfile
-          elif [ -f package-lock.json ]; then npm ci || npm i --legacy-peer-deps
-          else npm i --legacy-peer-deps; fi
-
-      - name: Lint (optional)
-        if: steps.detect.outputs.has_pkg == 'true'
-        run: npm run lint || echo "no lint script"
-
-      - name: Skip build (no Node project)
-        if: steps.detect.outputs.has_pkg == 'false'
-        run: echo "No package.json -> skipping build job"
+          corepack enable
+          corepack prepare pnpm@10.16.0 --activate
+          pnpm -v
+      - name: Install deps
+        run: pnpm install --frozen-lockfile
+      - name: Build (skip if no script)
+        run: |
+          if jq -e '.scripts.build' package.json >/dev/null; then
+            pnpm run -s build
+          else
+            echo "No build script -> skip"
+          fi
 
   unit-tests:
     runs-on: ubuntu-latest
+    needs: build
     steps:
       - uses: actions/checkout@v4
-
-      - name: Detect Node project
-        id: detect
-        run: |
-          if [ -f package.json ]; then
-            echo "has_pkg=true" >> $GITHUB_OUTPUT
-          else
-            echo "has_pkg=false" >> $GITHUB_OUTPUT
-          fi
-
       - uses: actions/setup-node@v4
-        if: steps.detect.outputs.has_pkg == 'true'
         with:
           node-version: '20'
-
+          cache: 'pnpm'
+      - name: Use pnpm via corepack
+        run: |
+          corepack enable
+          corepack prepare pnpm@10.16.0 --activate
+          pnpm -v
       - name: Install deps
-        if: steps.detect.outputs.has_pkg == 'true'
+        run: pnpm install --frozen-lockfile
+      - name: Run tests (fallback to node --test)
         run: |
-          corepack enable || true
-          if [ -f pnpm-lock.yaml ]; then npm i -g pnpm && pnpm i --no-frozen-lockfile
-          elif [ -f package-lock.json ]; then npm ci || npm i --legacy-peer-deps
-          else npm i --legacy-peer-deps; fi
+          if jq -e '.scripts.test' package.json >/dev/null; then
+            pnpm test
+          else
+            node --test
+          fi
 
-      - name: Run tests (only if tests exist)
-        if: steps.detect.outputs.has_pkg == 'true'
-        run: |
-          if [ ! -d tests ] && [ -z "$(ls -1 *.test.* 2>/dev/null || true)" ]; then
-            echo "No tests found -> skipping"; exit 0; fi
-          npm test || node --test
-
-      - name: Skip tests (no Node project)
-        if: steps.detect.outputs.has_pkg == 'false'
-        run: echo "No package.json -> skipping tests"
