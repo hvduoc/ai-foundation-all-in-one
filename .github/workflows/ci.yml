@@ -10,15 +10,19 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v3
         with:
-          version: 9
+          version: 10
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'pnpm'
+
+      - run: pnpm -v
       - run: pnpm install --frozen-lockfile
-      - run: pnpm build || echo "skip build step if not applicable"
+      - run: pnpm build
 
   unit-tests:
     runs-on: ubuntu-latest
@@ -28,15 +32,19 @@ jobs:
       REDIS_MOCK: 'true'
       USER_CACHE_TTL: '300'
       KEY_PREFIX: 'aicompany:dev:'
-      # KHÔNG đặt REDIS_URL ở đây để đảm bảo không nối Redis thật
+      # KHÔNG đặt REDIS_URL ở đây để không nối Redis thật
     steps:
       - uses: actions/checkout@v4
+
       - uses: pnpm/action-setup@v3
         with:
-          version: 9
+          version: 10
+
       - uses: actions/setup-node@v4
         with:
           node-version: 20
           cache: 'pnpm'
+
+      - run: pnpm -v
       - run: pnpm install --frozen-lockfile
       - run: pnpm test
