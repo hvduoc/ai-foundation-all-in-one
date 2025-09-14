@@ -11,8 +11,8 @@
     "redis": "^5.8.2"
   },
   "scripts": {
+    "build": "echo \"no build step\"",
     "test": "cross-env NODE_ENV=test REDIS_MOCK=true CI=true node --test",
-    "test:watch": "cross-env NODE_ENV=test REDIS_MOCK=true CI=true node --test --watch",
-    "dev": "cross-env NODE_ENV=development REDIS_MOCK=true node server.js"
+    "test:watch": "cross-env NODE_ENV=test REDIS_MOCK=true CI=true node --test --watch"
   }
 }
