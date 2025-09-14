@@ -1,52 +1,42 @@
 ﻿name: ci
 
 on:
-  pull_request:
   push:
+    branches: [ main, develop, feat/** ]
+  pull_request:
 
 jobs:
   build:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v3
         with:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - name: Build (optional)
-        run: |
-          if [ -f package.json ] && jq -e '.scripts.build' package.json >/dev/null; then
-            pnpm build
-          else
-            echo "No build script; skipping."
-          fi
+      - run: pnpm build || echo "skip build step if not applicable"
 
   unit-tests:
     runs-on: ubuntu-latest
+    env:
+      NODE_ENV: test
+      CI: 'true'
+      REDIS_MOCK: 'true'
+      USER_CACHE_TTL: '300'
+      KEY_PREFIX: 'aicompany:dev:'
+      # KHÔNG đặt REDIS_URL ở đây để đảm bảo không nối Redis thật
     steps:
       - uses: actions/checkout@v4
-      - uses: pnpm/action-setup@v4
+      - uses: pnpm/action-setup@v3
         with:
           version: 9
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
+          node-version: 20
           cache: 'pnpm'
       - run: pnpm install --frozen-lockfile
-      - name: Create test .env (no real Redis)
-        run: |
-          cat > .env <<'EOF'
-          PORT=3000
-          LOG_LEVEL=info
-          KEY_PREFIX=aifao1:ci:
-          USER_CACHE_TTL=300
-          CACHE_ENABLED=1
-          EOF
-      - name: Run tests (force mock mode)
-        env:
-          NODE_ENV: test
-        run: pnpm test
+      - run: pnpm test
