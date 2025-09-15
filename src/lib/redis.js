@@ -1,31 +1,45 @@
 ﻿/**
  * src/lib/redis.js
- * Redis singleton (Upstash TLS), key prefix, JSON helpers.
+ * Redis singleton (Upstash TLS) + ioredis-mock cho Test/CI, key prefix, JSON helpers.
  */
-const Redis = require('ioredis');
-
 const DEFAULT_TTL_SECONDS = Number(process.env.USER_CACHE_TTL || 300);
 const KEY_PREFIX = process.env.KEY_PREFIX || '';
+
+// Dùng mock khi:
+// - NODE_ENV === 'test'  hoặc
+// - CI === 'true'        hoặc
+// - REDIS_MOCK === 'true'
+const IS_MOCK =
+  process.env.NODE_ENV === 'test' ||
+  process.env.CI === 'true' ||
+  process.env.REDIS_MOCK === 'true';
 
 let _client = null;
 
 function createClient() {
-  const url = process.env.REDIS_URL;
-  if (!url) {
-    // Cho phép chạy local/dev không có REDIS_URL (test sẽ inject mock thay vì gọi client này)
-    return new Redis({
-      host: '127.0.0.1',
-      port: 6379,
-      lazyConnect: true,
-      enableOfflineQueue: false,
-      maxRetriesPerRequest: 1,
-      retryStrategy: () => null,
-      reconnectOnError: () => false,
-    });
+  if (IS_MOCK) {
+    // ioredis-mock API tương thích với ioredis
+    const IORedisMock = require('ioredis-mock');
+    return new IORedisMock();
   }
+
+  // Production/dev: dùng ioredis + TLS (nếu rediss://)
+  const Redis = require('ioredis');
+  const url = process.env.REDIS_URL;
+
+  if (!url) {
+    throw new Error(
+      'REDIS_URL is required in non-test environments (hoặc set REDIS_MOCK=true để dùng mock).'
+    );
+  }
+
   const isTLS = url.startsWith('rediss://');
   const hostname = (() => {
-    try { return new URL(url).hostname; } catch { return undefined; }
+    try {
+      return new URL(url).hostname;
+    } catch {
+      return undefined;
+    }
   })();
 
   return new Redis(url, {
@@ -41,9 +55,11 @@ function createClient() {
 function getRedis() {
   if (_client) return _client;
   _client = createClient();
-  // ioredis v5 có connect(); v4 tự connect
-  if (typeof _client.connect === 'function') {
-    _client.connect().catch(() => {/* để handler tự BYPASS nếu lỗi */});
+  // Với ioredis-mock: không cần connect()
+  if (!IS_MOCK && typeof _client.connect === 'function') {
+    _client.connect().catch(() => {
+      /* Cho phép handler phía trên BYPASS nếu lỗi kết nối */
+    });
   }
   return _client;
 }
@@ -53,11 +69,15 @@ function buildKey(key) {
   return key.startsWith(KEY_PREFIX) ? key : KEY_PREFIX + key;
 }
 
-// Các helper JSON: key truyền vào đã là FULL KEY (đã buildKey)
+// Các helper JSON
 async function getJson(client, key) {
   const raw = await client.get(key);
   if (!raw) return null;
-  try { return JSON.parse(raw); } catch { return null; }
+  try {
+    return JSON.parse(raw);
+  } catch {
+    return null;
+  }
 }
 
 async function setJson(client, key, value, ttlSec = DEFAULT_TTL_SECONDS) {
@@ -65,11 +85,24 @@ async function setJson(client, key, value, ttlSec = DEFAULT_TTL_SECONDS) {
   await client.set(key, payload, 'EX', Number(ttlSec) || DEFAULT_TTL_SECONDS);
 }
 
+async function disconnect() {
+  if (_client && typeof _client.quit === 'function') {
+    try {
+      await _client.quit();
+    } catch {
+      /* noop */
+    }
+  }
+  _client = null;
+}
+
 module.exports = {
   DEFAULT_TTL_SECONDS,
   KEY_PREFIX,
+  IS_MOCK,
   getRedis,
   buildKey,
   getJson,
   setJson,
+  disconnect,
 };
