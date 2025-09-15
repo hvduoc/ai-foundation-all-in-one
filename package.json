@@ -1,0 +1,18 @@
+{
+  "devDependencies": {
+    "ioredis-mock": "^8.9.0",
+    "cross-env": "^7.0.3"
+  },
+  "dependencies": {
+    "dotenv": "^17.2.2",
+    "fastify": "^5.6.0",
+    "ioredis": "^5.7.0",
+    "pino": "^9.9.5",
+    "redis": "^5.8.2"
+  },
+  "scripts": {
+    "build": "echo \"no build step\"",
+    "test": "cross-env NODE_ENV=test REDIS_MOCK=true CI=true node --test",
+    "test:watch": "cross-env NODE_ENV=test REDIS_MOCK=true CI=true node --test --watch"
+  }
+}
